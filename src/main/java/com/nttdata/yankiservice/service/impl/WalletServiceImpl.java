@@ -4,7 +4,6 @@ import com.nttdata.yankiservice.dto.PaymentDto;
 import com.nttdata.yankiservice.dto.WalletDto;
 import com.nttdata.yankiservice.exception.DomainException;
 import com.nttdata.yankiservice.model.Wallet;
-import com.nttdata.yankiservice.producer.WalletProducer;
 import com.nttdata.yankiservice.repo.IWalletRepo;
 import com.nttdata.yankiservice.service.IWalletService;
 import com.nttdata.yankiservice.util.WalletMapper;
@@ -24,11 +23,9 @@ import java.util.stream.Collectors;
 public class WalletServiceImpl implements IWalletService {
 
     private final IWalletRepo repo;
-    private final WalletProducer walletProducer;
 
     @Override
     public List<WalletDto> getAll() {
-        walletProducer.sendMessage("gaaaa");
         List<Wallet> wallets = new ArrayList<>();
         repo.findAll().forEach(wallets::add);
         return wallets.stream().map(WalletMapper::toWalletDto).collect(Collectors.toList());
@@ -44,22 +41,26 @@ public class WalletServiceImpl implements IWalletService {
     }
 
     @Override
+    public WalletDto getByCellPhoneNumber(String cellPhoneNumber) {
+        return repo.findByCellPhoneNumber(cellPhoneNumber)
+                .map(WalletMapper::toWalletDto)
+                .orElseThrow(() -> new DomainException(HttpStatus.BAD_REQUEST, "Cell phone number not found: " + cellPhoneNumber));
+    }
+
+    @Override
     public WalletDto register(WalletDto wallet) {
         return WalletMapper.toWalletDto(repo.save(WalletMapper.toWallet(wallet)));
     }
 
     @Override
     public WalletDto doPayment(PaymentDto payment) {
-        Wallet sourceWallet = repo.findByCellPhoneNumber(payment.getSourceCellPhoneNumber())
-                .orElseThrow(() -> new DomainException(HttpStatus.BAD_REQUEST, "Source cell phone number not found"));
-        Wallet targetWallet = repo.findByCellPhoneNumber(payment.getTargetCellPhoneNumber())
-                .orElseThrow(() -> new DomainException(HttpStatus.BAD_REQUEST, "Target cell phone number not found"));
-
+        WalletDto sourceWallet = this.getByCellPhoneNumber(payment.getSourceCellPhoneNumber());
+        WalletDto targetWallet = this.getByCellPhoneNumber(payment.getTargetCellPhoneNumber());
         if (sourceWallet.getBalance() < payment.getAmount()) {
             throw new DomainException(HttpStatus.BAD_REQUEST, "Insufficient balance");
         }
-        Wallet updatedSourceWallet = repo.save(sourceWallet.toBuilder().balance(sourceWallet.getBalance() - payment.getAmount()).build());
-        repo.save(targetWallet.toBuilder().balance(targetWallet.getBalance() + payment.getAmount()).build());
+        Wallet updatedSourceWallet = repo.save(WalletMapper.toWallet(sourceWallet.toBuilder().balance(sourceWallet.getBalance() - payment.getAmount()).build()));
+        repo.save((WalletMapper.toWallet(targetWallet.toBuilder().balance(targetWallet.getBalance() + payment.getAmount()).build())));
         return WalletMapper.toWalletDto(updatedSourceWallet);
     }
 

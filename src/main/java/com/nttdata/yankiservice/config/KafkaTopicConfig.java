@@ -21,7 +21,7 @@ public class KafkaTopicConfig {
 
     @Bean
     public NewTopic topic1() {
-        return new NewTopic("FIND_WALLET_BY_ID", 1, (short) 1);
+        return new NewTopic("reactive-test", 1, (short) 1);
     }
 
 }

@@ -11,6 +11,8 @@ public interface IWalletService {
 
     WalletDto getById(String id);
 
+    WalletDto getByCellPhoneNumber(String cellPhoneNumber);
+
     WalletDto register(WalletDto wallet);
 
     WalletDto doPayment(PaymentDto payment);
